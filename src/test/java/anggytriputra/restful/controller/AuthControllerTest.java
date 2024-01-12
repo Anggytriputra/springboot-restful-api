@@ -1,7 +1,8 @@
 package anggytriputra.restful.controller;
 
 import anggytriputra.restful.entity.User;
-import anggytriputra.restful.model.RegisterUserRequest;
+import anggytriputra.restful.model.LoginUserRequest;
+import anggytriputra.restful.model.TokenResponse;
 import anggytriputra.restful.model.WebResponse;
 import anggytriputra.restful.repository.UserRepository;
 import anggytriputra.restful.security.BCrypt;
@@ -23,7 +24,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
-class UserControllerTest {
+class AuthControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
@@ -35,81 +36,89 @@ class UserControllerTest {
     private ObjectMapper objectMapper;
 
     @BeforeEach
-    void setUp() {
+    void setUp(){
         userRepository.deleteAll();
     }
 
     @Test
-    void testRegisterSuccess() throws Exception{
-        RegisterUserRequest request = new RegisterUserRequest();
-        request.setUsername("Anggytriputra");
-        request.setPassword("rahasia");
-        request.setName("anggy triputra");
+    void loginFailedUserNotFound() throws Exception{
+        LoginUserRequest request = new LoginUserRequest();
+        request.setUsername("test");
+        request.setPassword("test");
 
         mockMvc.perform(
-//                ini mengarah ke controller
-                post("/api/users")
-                        .accept(MediaType.APPLICATION_JSON_VALUE)
+                post("/api/auth/login")
+                        .accept(MediaType.APPLICATION_JSON)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request))
+        ).andExpectAll(
+                status().isUnauthorized()
+        ).andDo(result -> {
+            WebResponse<String> response = objectMapper.readValue(result.getResponse().getContentAsString(), new TypeReference<>() {
+            });
+            assertNotNull(response.getErrors());
+        });
+    }
+
+
+    @Test
+    void loginFailedWrongPassword() throws Exception{
+        User user = new User();
+        user.setName("Test");
+        user.setUsername("test");
+        user.setPassword(BCrypt.hashpw("test", BCrypt.gensalt()));
+        userRepository.save(user);
+
+        LoginUserRequest request = new LoginUserRequest();
+        request.setUsername("test");
+        request.setPassword("password salah");
+
+        mockMvc.perform(
+                post("/api/auth/login")
+                        .accept(MediaType.APPLICATION_JSON)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request))
+        ).andExpectAll(
+                status().isUnauthorized()
+        ).andDo(result -> {
+            WebResponse<String> response = objectMapper.readValue(result.getResponse().getContentAsString(), new TypeReference<>() {
+            });
+            assertNotNull(response.getErrors());
+        });
+    }
+
+
+    @Test
+    void loginSuccess() throws Exception{
+        User user = new User();
+        user.setName("Test");
+        user.setUsername("test");
+        user.setPassword(BCrypt.hashpw("test", BCrypt.gensalt()));
+        userRepository.save(user);
+
+        LoginUserRequest request = new LoginUserRequest();
+        request.setUsername("test");
+        request.setPassword("test");
+
+        mockMvc.perform(
+                post("/api/auth/login")
+                        .accept(MediaType.APPLICATION_JSON)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request))
         ).andExpectAll(
                 status().isOk()
         ).andDo(result -> {
-            WebResponse<String> response = objectMapper.readValue(result.getResponse().getContentAsString(), new TypeReference<>() {
+            WebResponse<TokenResponse> response = objectMapper.readValue(result.getResponse().getContentAsString(), new TypeReference<>() {
             });
+            assertNull(response.getErrors());
+            assertNotNull(response.getData().getToken());
+            assertNotNull(response.getData().getExpiredAt());
 
-            assertEquals("OK", response.getData());
-        });
-    }
+            User userDb = userRepository.findById("test").orElse(null);
+            assertNotNull(userDb);
+            assertEquals(userDb.getToken(), response.getData().getToken());
+            assertEquals(userDb.getTokenExpiredAt(), response.getData().getExpiredAt());
 
-    @Test
-    void testRegisterBadRequest() throws Exception{
-        RegisterUserRequest request = new RegisterUserRequest();
-        request.setUsername("");
-        request.setPassword("");
-        request.setName("");
-
-        mockMvc.perform(
-                post("/api/users")
-                        .accept(MediaType.APPLICATION_JSON_VALUE)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request))
-        ).andExpectAll(
-                status().isBadRequest()
-        ).andDo(result -> {
-            WebResponse<String> response = objectMapper.readValue(result.getResponse().getContentAsString(), new TypeReference<>() {
-            });
-
-            assertNotNull(response.getErrors());
-        });
-    }
-
-
-    @Test
-    void testRegisterDuplicate() throws Exception{
-        User user = new User();
-        user.setUsername("anggytriputra");
-        user.setPassword(BCrypt.hashpw("rahasia", BCrypt.gensalt()));
-        user.setName("anggy triputra");
-        userRepository.save(user);
-
-        RegisterUserRequest request = new RegisterUserRequest();
-        request.setUsername("anggytriputra");
-        request.setPassword("rahasia");
-        request.setName("anggy triputra");
-
-        mockMvc.perform(
-                post("/api/users")
-                        .accept(MediaType.APPLICATION_JSON_VALUE)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request))
-        ).andExpectAll(
-                status().isBadRequest()
-        ).andDo(result -> {
-            WebResponse<String> response = objectMapper.readValue(result.getResponse().getContentAsString(), new TypeReference<>() {
-            });
-
-            assertNotNull(response.getErrors());
         });
     }
 }

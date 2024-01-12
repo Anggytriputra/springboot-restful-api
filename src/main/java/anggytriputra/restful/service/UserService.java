@@ -2,6 +2,7 @@ package anggytriputra.restful.service;
 
 import anggytriputra.restful.entity.User;
 import anggytriputra.restful.model.RegisterUserRequest;
+import anggytriputra.restful.model.UserResponse;
 import anggytriputra.restful.repository.UserRepository;
 import anggytriputra.restful.security.BCrypt;
 import jakarta.validation.ConstraintViolation;
@@ -22,14 +23,11 @@ public class UserService {
     private UserRepository userRepository;
 
     @Autowired
-    private Validator validator;
+    private ValidationService validationService;
 
     @Transactional
     public void register(RegisterUserRequest request){
-        Set<ConstraintViolation<RegisterUserRequest>> constraintViolations = validator.validate(request);
-        if (constraintViolations.size() != 0){
-            throw  new ConstraintViolationException(constraintViolations);
-        }
+        validationService.validate(request);
 
         if (userRepository.existsById(request.getUsername())){
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "username already registered");
@@ -41,5 +39,12 @@ public class UserService {
         user.setName(request.getName());
 
         userRepository.save(user);
+    }
+
+    public UserResponse get(User user){
+        return UserResponse.builder()
+                .username(user.getUsername())
+                .name(user.getName())
+                .build();
     }
 }
