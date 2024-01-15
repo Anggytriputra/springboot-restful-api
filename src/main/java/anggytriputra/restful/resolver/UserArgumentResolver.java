@@ -3,6 +3,7 @@ package anggytriputra.restful.resolver;
 import anggytriputra.restful.entity.User;
 import anggytriputra.restful.repository.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpStatus;
@@ -14,6 +15,7 @@ import org.springframework.web.method.support.ModelAndViewContainer;
 import org.springframework.web.server.ResponseStatusException;
 
 @Component
+@Slf4j
 public class UserArgumentResolver implements HandlerMethodArgumentResolver {
 
     @Autowired
@@ -29,12 +31,18 @@ public class UserArgumentResolver implements HandlerMethodArgumentResolver {
 
         HttpServletRequest servletRequest = (HttpServletRequest) webRequest.getNativeRequest();
         String token = servletRequest.getHeader("X-API-TOKEN");
+        log.info("TOKEN ADALAH {}", token);
         if (token == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unauthorized");
         }
 
         User user = userRepository.findFirstByToken(token)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
+        log.info("USER ADALAH {}", user);
+
+        if (user.getTokenExpiredAt() < System.currentTimeMillis()){
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unauthorized");
+        }
 
         return  user;
     }
