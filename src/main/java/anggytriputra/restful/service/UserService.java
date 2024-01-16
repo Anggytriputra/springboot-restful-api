@@ -71,7 +71,7 @@ public class UserService {
         }
 
         userRepository.save(user);
-        
+
         log.info("USER INI {}", user.getName());
 
         return UserResponse.builder()
